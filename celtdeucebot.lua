@@ -5,6 +5,7 @@ InAction = InAction or false
 
 Logs = Logs or {}
 
+
 colors = {
   red = "\27[31m",
   green = "\27[32m",
@@ -12,9 +13,7 @@ colors = {
   reset = "\27[0m",
   gray = "\27[90m"
 }
-function inRange(x1, y1, x2, y2, range)
-    return math.abs(x1 - x2) <= range and math.abs(y1 - y2) <= range
-end
+
 
 function addLog(msg, text) -- Function definition commented for performance, can be used for debugging
   Logs[msg] = Logs[msg] or {}
@@ -27,6 +26,10 @@ end
 -- @param range: The maximum allowed distance between the points.
 -- @return: Boolean indicating if the points are within the specified range.
 -- Function to assess the threat level of an opponent based on their stats
+function inRange(x1, y1, x2, y2, range)
+    return math.abs(x1 - x2) <= range and math.abs(y1 - y2) <= range
+end
+
 function assessThreatLevel(opponentState)
   -- Initialize the threat level
   local threatLevel = 0
@@ -39,6 +42,17 @@ function assessThreatLevel(opponentState)
   -- Return the calculated threat level
   return threatLevel
 end
+-- Define the map of possible directions and their corresponding vector changes
+local directionMap = {
+  Up = {x = 0, y = -1},
+  Down = {x = 0, y = 1},
+  Left = {x = -1, y = 0},
+  Right = {x = 1, y = 0},
+  UpRight = {x = 1, y = -1},
+  UpLeft = {x = -1, y = -1},
+  DownRight = {x = 1, y = 1},
+  DownLeft = {x = -1, y = 1}
+}
 
 -- Function to decide the next action based on player proximity, energy, and threat level
 function gameModeBegins()
@@ -84,11 +98,47 @@ end
 function findSafestDirection(playerState)
   local safestDirection = "Up"
   local leastDangerousScore = math.huge
+-- Function to determine if a given position is dangerous based on the positions of other players
+function isPositionDangerous(x, y)
+  local dangerZoneRange = 3 -- Define the range within which other players are considered a threat
 
+  for _, opponentState in pairs(LatestGameState.Players) do
+    if opponentState.id ~= BotID and inRange(x, y, opponentState.x, opponentState.y, dangerZoneRange) then
+      return true -- The position is dangerous because another player is too close
+    end
+  end
+  return false -- The position is not dangerous
+end
+
+-- Function to calculate a danger score for a position
+function calculateDangerScore(x, y)
+  local dangerScore = 0
+  local checkRange = 5 -- The range to check for nearby players
+
+  for _, opponentState in pairs(LatestGameState.Players) do
+    if opponentState.id ~= BotID then
+      -- Increase the danger score the closer the opponent is
+      local distance = calculateDistance(x, y, opponentState.x, opponentState.y)
+      if distance < checkRange then
+        dangerScore = dangerScore + (checkRange - distance) -- Closer opponents contribute more to the danger score
+      end
+    end
+  end
+
+  return dangerScore
+end
+
+-- Helper function to calculate the distance between two points
+function calculateDistance(x1, y1, x2, y2)
+  return math.sqrt((x2 - x1)^2 + (y2 - y1)^2)
+end
+
+  
   -- Check each direction for safety
   for direction, vector in pairs(directionMap) do
     local newX = (playerState.x + vector.x - 1) % Width + 1
     local newY = (playerState.y + vector.y - 1) % Height + 1
+    
 
     -- If the new position is not dangerous, consider moving there
     if not isPositionDangerous(newX, newY) then
